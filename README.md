@@ -1,6 +1,6 @@
 # 🍝 Marinara Engine
 
-### Release 1.2.0
+### Release 1.2.1
 
 **An AI-powered chat & roleplay engine** — with conversation, roleplay, and visual novel modes, a full character & sprite system, 18 built-in AI agents, turn-based combat, lorebooks, and more.
 
@@ -11,6 +11,13 @@ Everything runs locally. No accounts, no cloud, no telemetry. Connect to any Ope
 ---
 
 ## Changelog
+
+### v1.2.1
+
+**Fixes:**
+- **ST Preset Import Order** — Imported SillyTavern presets now preserve the exact section ordering from `prompt_order` instead of using the definition order.
+- **ST Preset Name Import** — Preset names are now correctly extracted from Read-Me comments (e.g. "Marinara's Spaghetti Recipe") and from the filename, instead of defaulting to "SillyTavern Preset."
+- **Custom Provider Model Selector** — The search input now receives focus immediately when the dropdown opens, so you can click and type instead of needing Shift+Tab.
 
 ### v1.2.0
 
@@ -101,7 +108,7 @@ All agents are disabled by default — enable only the ones you want. You can al
 
 ### Windows Installer (Recommended)
 
-Download **[Marinara-Engine-Installer-1.2.0.exe](https://github.com/SpicyMarinara/Marinara-Engine/releases/download/v1.2.0/Marinara-Engine-Installer-1.2.0.exe)** from the [Releases](https://github.com/SpicyMarinara/Marinara-Engine/releases) page and run it. The installer checks for Node.js and Git, clones the repo, installs everything, and creates a desktop shortcut.
+Download **[Marinara-Engine-Installer-1.2.1.exe](https://github.com/SpicyMarinara/Marinara-Engine/releases/download/v1.2.1/Marinara-Engine-Installer-1.2.1.exe)** from the [Releases](https://github.com/SpicyMarinara/Marinara-Engine/releases) page and run it. The installer checks for Node.js and Git, clones the repo, installs everything, and creates a desktop shortcut.
 
 You still need **Node.js** and **Git** installed first (the installer will tell you if they're missing).
 

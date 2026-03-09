@@ -639,7 +639,6 @@ export function ConnectionEditor() {
                               }}
                               className="w-full rounded-lg bg-[var(--secondary)] px-3 py-2 text-sm ring-1 ring-[var(--border)] focus:outline-none focus:ring-sky-400/50"
                               placeholder="model-name-or-path"
-                              autoFocus
                             />
                             {/* Show fetched models for custom provider */}
                             {remoteModels.length > 0 && (
