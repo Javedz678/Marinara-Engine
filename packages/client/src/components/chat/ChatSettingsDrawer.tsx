@@ -975,7 +975,7 @@ export function ChatSettingsDrawer({ chat, open, onClose }: ChatSettingsDrawerPr
               </button>
               <p className="text-[10px] text-[var(--muted-foreground)] px-1">
                 {metadata.enableTools
-                  ? "If enabled, the functions added to this chat will be available."
+                  ? "If enabled, this chat can use globally enabled tools (or any tools you add below)."
                   : "If disabled, no functions will be available."}
               </p>
 
@@ -983,7 +983,9 @@ export function ChatSettingsDrawer({ chat, open, onClose }: ChatSettingsDrawerPr
               {metadata.enableTools && (
                 <>
                   {activeToolIds.length === 0 ? (
-                    <p className="text-[11px] text-[var(--muted-foreground)] px-1">No functions added to this chat.</p>
+                    <p className="text-[11px] text-[var(--muted-foreground)] px-1">
+                      All globally enabled tools are available to this chat. Add tools below to restrict this chat to a specific set.
+                    </p>
                   ) : (
                     <div className="flex flex-col gap-1">
                       {activeToolIds.map((toolId) => {
