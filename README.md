@@ -1,6 +1,6 @@
 # 🍝 Marinara Engine
 
-## Release 1.4.0
+## Release 1.4.1
 
 <h3 align="center"><b>Fun. Intuitive. Plug-And-Play.</b></h3>
 
@@ -54,6 +54,24 @@
 
 ## Changelog
 
+### v1.4.1
+
+**Added:**
+
+- **Per-Connection Embedding Provider** — Each connection can now specify a separate API connection to use for embeddings, instead of always using the same provider. Configurable from the Connection Editor and overridable per-chat in Chat Settings.
+
+**Bug Fixes:**
+
+- **Preset Variable Editing Reset** — Editing a preset variable (renaming, changing options) no longer resets selections for all other variables back to defaults.
+- **Modal Visual Flicker** — Rewrote Modal.tsx from framer-motion to pure CSS transitions, eliminating the persistent flicker caused by React.StrictMode double-rendering and spring animation overshoot.
+- **Mobile Viewport Overlap** — Chat UI no longer disappears behind mobile browser chrome. Root container changed from `h-screen`/`100dvh` to `fixed inset-0` for reliable mobile viewport sizing.
+- **GPT-5.4 Reasoning Summaries** — All `gpt-5.4` variants (not just `gpt-5.4-pro`) now correctly route through the Responses API, and reasoning summaries are extracted in both streaming and non-streaming paths.
+- **xHigh Reasoning Effort** — The `xhigh` reasoning tier is now properly gated to `gpt-5.4*` models only, preventing unsupported effort values from being sent to other providers.
+- **Embedding Connection URL Resolution** — Embedding connections now use `resolveBaseUrl()` for proper URL construction, fixing failures when the alternate embedding provider had a non-standard base URL.
+- **Embedding Model Fallback** — When an alternate embedding connection has no embedding model configured, the system now correctly falls back to the source connection's embedding model.
+
+---
+
 ### v1.4.0
 
 **Added:**
@@ -91,7 +109,7 @@
 
 ## Windows EASIEST METHOD
 
-Download **[Marinara-Engine-Installer-1.4.0.exe](https://github.com/SpicyMarinara/Marinara-Engine/releases/download/v1.4.0/Marinara-Engine-Installer-1.4.0.exe)** from the [Releases](https://github.com/SpicyMarinara/Marinara-Engine/releases) page and run it. The installer checks for Node.js and Git, clones the repo, installs dependencies, builds the app, and creates a desktop shortcut.
+Download **[Marinara-Engine-Installer-1.4.1.exe](https://github.com/SpicyMarinara/Marinara-Engine/releases/download/v1.4.1/Marinara-Engine-Installer-1.4.1.exe)** from the [Releases](https://github.com/SpicyMarinara/Marinara-Engine/releases) page and run it. The installer checks for Node.js and Git, clones the repo, installs dependencies, builds the app, and creates a desktop shortcut.
 
 ---
 

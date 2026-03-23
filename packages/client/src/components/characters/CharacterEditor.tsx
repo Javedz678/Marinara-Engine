@@ -5,6 +5,7 @@
 //           Appearance, Scenario, Dialogue, Advanced, Lorebook
 // ──────────────────────────────────────────────
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import {
   useCharacter,
   useUpdateCharacter,
@@ -130,6 +131,9 @@ export function CharacterEditor() {
     try {
       await updateCharacter.mutateAsync({ id: characterId, data: formData as unknown as Record<string, unknown> });
       setDirty(false);
+    } catch (err: any) {
+      console.error("[CharacterEditor] Save failed:", err);
+      toast.error(err?.message ?? "Failed to save character. Check the console for details.");
     } finally {
       setSaving(false);
     }
