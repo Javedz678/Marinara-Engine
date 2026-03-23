@@ -202,7 +202,7 @@ export function PersonasPanel() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100">
                 {!active && (
                   <button
                     onClick={(e) => {

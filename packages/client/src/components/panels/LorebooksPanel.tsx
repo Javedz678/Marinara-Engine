@@ -264,7 +264,7 @@ function LorebookRow({
           e.stopPropagation();
           onDelete();
         }}
-        className="rounded-lg p-1.5 opacity-0 transition-all hover:bg-[var(--destructive)]/15 group-hover:opacity-100 active:scale-90"
+        className="rounded-lg p-1.5 opacity-0 transition-all hover:bg-[var(--destructive)]/15 group-hover:opacity-100 max-md:opacity-100 active:scale-90"
       >
         <svg
           width="13"

@@ -172,7 +172,7 @@ export function ConnectionsPanel() {
                     "rounded-lg p-1.5 transition-all active:scale-90",
                     inRandomPool
                       ? "bg-amber-400/15 text-amber-400"
-                      : "text-[var(--muted-foreground)] opacity-0 group-hover:opacity-100 hover:bg-amber-400/10 hover:text-amber-400",
+                      : "text-[var(--muted-foreground)] opacity-0 group-hover:opacity-100 max-md:opacity-100 hover:bg-amber-400/10 hover:text-amber-400",
                   )}
                   title={inRandomPool ? "In random pool (click to remove)" : "Add to random pool"}
                 >
@@ -183,7 +183,7 @@ export function ConnectionsPanel() {
                     e.stopPropagation();
                     testConnection.mutate(conn.id);
                   }}
-                  className="rounded-lg p-1.5 text-[var(--muted-foreground)] opacity-0 group-hover:opacity-100 transition-all hover:bg-sky-400/10 active:scale-90"
+                  className="rounded-lg p-1.5 text-[var(--muted-foreground)] opacity-0 group-hover:opacity-100 max-md:opacity-100 transition-all hover:bg-sky-400/10 active:scale-90"
                   title="Test connection"
                 >
                   {testConnection.isPending ? (
@@ -201,7 +201,7 @@ export function ConnectionsPanel() {
                       },
                     });
                   }}
-                  className="rounded-lg p-1.5 text-[var(--muted-foreground)] opacity-0 group-hover:opacity-100 transition-all hover:bg-sky-400/10 hover:text-sky-400 active:scale-90"
+                  className="rounded-lg p-1.5 text-[var(--muted-foreground)] opacity-0 group-hover:opacity-100 max-md:opacity-100 transition-all hover:bg-sky-400/10 hover:text-sky-400 active:scale-90"
                   title="Duplicate connection"
                 >
                   <Copy size="0.8125rem" />
@@ -211,7 +211,7 @@ export function ConnectionsPanel() {
                     e.stopPropagation();
                     deleteConnection.mutate(conn.id);
                   }}
-                  className="rounded-lg p-1.5 opacity-0 transition-all hover:bg-[var(--destructive)]/15 group-hover:opacity-100 active:scale-90"
+                  className="rounded-lg p-1.5 opacity-0 transition-all hover:bg-[var(--destructive)]/15 group-hover:opacity-100 max-md:opacity-100 active:scale-90"
                 >
                   <Trash2 size="0.8125rem" className="text-[var(--destructive)]" />
                 </button>

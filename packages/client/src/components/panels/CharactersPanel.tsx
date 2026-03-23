@@ -464,7 +464,7 @@ export function CharactersPanel() {
                         </>
                       )}
                     </div>
-                    <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
+                    <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100 max-md:opacity-100">
                       {activeChat && (
                         <button
                           onClick={(e) => {
@@ -719,7 +719,7 @@ export function CharactersPanel() {
 
               {/* Actions (hidden during group assign mode) */}
               {!assigningToGroup && (
-                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
+                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100 max-md:opacity-100">
                   {activeChat && (
                     <button
                       onClick={(e) => {
