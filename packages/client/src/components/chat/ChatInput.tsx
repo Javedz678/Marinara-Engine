@@ -38,6 +38,7 @@ export function ChatInput({ mode = "conversation", characterNames = [] }: ChatIn
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resizeRafRef = useRef<number>(0);
   const activeChatId = useChatStore((s) => s.activeChatId);
   const streamingChatId = useChatStore((s) => s.streamingChatId);
   const isStreamingGlobal = useChatStore((s) => s.isStreaming);
@@ -71,6 +72,9 @@ export function ChatInput({ mode = "conversation", characterNames = [] }: ChatIn
       const draft = useChatStore.getState().inputDrafts.get(activeChatId) ?? "";
       textareaRef.current.value = draft;
       setHasInput(draft.trim().length > 0);
+      // Resize textarea to fit content
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + "px";
     }
   }, [activeChatId, setInputDraft, clearInputDraft]);
 
@@ -80,6 +84,7 @@ export function ChatInput({ mode = "conversation", characterNames = [] }: ChatIn
     return () => {
       // Cancel pending debounce/rAF
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+      cancelAnimationFrame(resizeRafRef.current);
       // Flush draft synchronously
       const chatId = useChatStore.getState().activeChatId;
       if (chatId && textarea) {
@@ -183,6 +188,7 @@ export function ChatInput({ mode = "conversation", characterNames = [] }: ChatIn
 
       if (textareaRef.current) {
         textareaRef.current.value = "";
+        textareaRef.current.style.height = "auto";
       }
       setHasInput(false);
       setCompletions([]);
@@ -209,6 +215,7 @@ export function ChatInput({ mode = "conversation", characterNames = [] }: ChatIn
 
     if (textareaRef.current) {
       textareaRef.current.value = "";
+      textareaRef.current.style.height = "auto";
     }
     setHasInput(false);
     setCompletions([]);
@@ -294,6 +301,14 @@ export function ChatInput({ mode = "conversation", characterNames = [] }: ChatIn
         }
       }, 300);
     }
+
+    // Auto-resize textarea (schedule via rAF to avoid layout thrashing)
+    cancelAnimationFrame(resizeRafRef.current);
+    resizeRafRef.current = requestAnimationFrame(() => {
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+    });
 
     // Slash command autocomplete
     const trimmed = fixed.trim();
@@ -420,7 +435,7 @@ export function ChatInput({ mode = "conversation", characterNames = [] }: ChatIn
           rows={1}
           spellCheck
           autoCorrect="on"
-          className="mari-chat-input-textarea max-h-[12.5rem] flex-1 resize-none bg-transparent py-0 text-sm leading-normal text-white/90 placeholder:text-white/30 outline-none disabled:cursor-not-allowed disabled:opacity-40 [field-sizing:content]"
+          className="mari-chat-input-textarea max-h-[12.5rem] flex-1 resize-none bg-transparent py-0 text-sm leading-normal text-white/90 placeholder:text-white/30 outline-none disabled:cursor-not-allowed disabled:opacity-40"
         />
 
         {/* Send / Stop button */}
