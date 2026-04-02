@@ -33,6 +33,7 @@ export const generateRequestSchema = z.object({
   impersonate: z.boolean().optional().default(false),
   userStatus: z.enum(["active", "idle", "dnd"]).optional().default("active"),
   mentionedCharacterNames: z.array(z.string()).optional().default([]),
+  forCharacterId: z.string().nullable().optional().default(null),
   attachments: z
     .array(
       z.object({

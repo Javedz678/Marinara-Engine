@@ -1636,8 +1636,6 @@ export async function generateRoutes(app: FastifyInstance) {
       }
 
       for (const cfg of enabledConfigs) {
-        // Chat Summary agent is manual-only — skip it in the generation pipeline
-        if (cfg.type === "chat-summary") continue;
         // If this chat has a per-chat agent list, only include agents in that list
         if (hasPerChatAgentList && !perChatAgentSet.has(cfg.type)) continue;
         const settings = cfg.settings ? JSON.parse(cfg.settings as string) : {};
@@ -2353,7 +2351,40 @@ export async function generateRoutes(app: FastifyInstance) {
         }
       }
 
-      // Chat summary is manual-only — never injected into agent prompts
+      // ────────────────────────────────────────
+      // Automated Chat Summary — interval gating
+      // ────────────────────────────────────────
+      // Only run if the Automated Chat Summary agent is in the pipeline.
+      // It triggers every N user messages (configured via `runInterval` in the agent settings).
+      // The context size for summary generation comes from the chat's summaryContextSize metadata.
+      if (resolvedAgents.some((a) => a.type === "chat-summary")) {
+        const csAgent = resolvedAgents.find((a) => a.type === "chat-summary")!;
+        const triggersAfter = (csAgent.settings.runInterval as number) ?? 5;
+        let shouldRun = true;
+
+        if (triggersAfter > 1) {
+          const lastRun = await agentsStore.getLastSuccessfulRunByType("chat-summary", input.chatId);
+          if (lastRun) {
+            const lastRunMsgId = lastRun.messageId;
+            const lastRunIdx = allChatMessages.findIndex((m: any) => m.id === lastRunMsgId);
+            const userMsgsSince =
+              lastRunIdx >= 0 ? allChatMessages.slice(lastRunIdx + 1).filter((m: any) => m.role === "user") : [];
+            // +1 for the current user message being generated
+            if (userMsgsSince.length + 1 < triggersAfter) {
+              shouldRun = false;
+            }
+          }
+          // First run ever: allow it to proceed
+        }
+
+        if (!shouldRun) {
+          resolvedAgents.splice(resolvedAgents.indexOf(csAgent), 1);
+        } else {
+          // Override the agent's context size with the chat-level summaryContextSize
+          const summaryCtxSize = (chatMeta.summaryContextSize as number) || 50;
+          csAgent.settings = { ...csAgent.settings, contextSize: summaryCtxSize };
+        }
+      }
 
       // ────────────────────────────────────────
       // Tracker Data Injection
@@ -2774,9 +2805,8 @@ export async function generateRoutes(app: FastifyInstance) {
         }
       }
 
-      // Notify UI if the chat-summary agent is enabled and was injected into the prompt
-      const chatSummaryEnabled = enabledConfigs.some((c: any) => c.type === "chat-summary");
-      if (chatSummaryEnabled && chatMeta.summary) {
+      // Notify UI if a chat summary was injected into the prompt (works with or without the agent)
+      if (chatMeta.summary) {
         const chatSummaryCfg = enabledConfigs.find((c: any) => c.type === "chat-summary");
         reply.raw.write(
           `data: ${JSON.stringify({
@@ -2903,12 +2933,16 @@ export async function generateRoutes(app: FastifyInstance) {
       // Merged/single: one generation for the first (or merged) character
       const useIndividualLoop = isGroupChat && groupChatMode === "individual" && !input.regenerateMessageId; // regeneration always targets one message
 
-      // For smart ordering, an agent would decide who responds.
-      // For now, smart falls back to all characters (can be upgraded to an agent later).
+      // Manual mode with forCharacterId: only generate for the specified character
+      // Sequential/smart: all characters respond
       const respondingCharIds = useIndividualLoop
-        ? groupResponseOrder === "sequential"
-          ? [...characterIds]
-          : [...characterIds] // smart: placeholder, same as sequential for now
+        ? input.forCharacterId && characterIds.includes(input.forCharacterId)
+          ? [input.forCharacterId]
+          : groupResponseOrder === "manual"
+            ? [] // manual mode without forCharacterId: no auto-generation
+            : groupResponseOrder === "sequential"
+              ? [...characterIds]
+              : [...characterIds] // smart: placeholder, same as sequential for now
         : [characterIds[0] ?? null];
 
       /** Generate a single response for a given character and save it. */

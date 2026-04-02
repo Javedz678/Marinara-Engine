@@ -896,16 +896,41 @@ export async function chatsRoutes(app: FastifyInstance) {
   // ── Generate Summary ──
   // Calls the LLM to produce a rolling summary from the chat history,
   // saves it into chatMetadata.summary, and returns it.
+  // Model resolution: chat-summary agent connection → default-for-agents → chat connection.
   app.post<{ Params: { id: string } }>("/:id/generate-summary", async (req, reply) => {
     const chat = await storage.getById(req.params.id);
     if (!chat) return reply.status(404).send({ error: "Chat not found" });
 
     const chatMeta = typeof chat.metadata === "string" ? JSON.parse(chat.metadata) : (chat.metadata ?? {});
+
+    // Accept context size from request body, fall back to chat meta, then default 50
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const contextSize = Math.max(5, Math.min(200, Number(body.contextSize) || (chatMeta.summaryContextSize as number) || 50));
+
     const connId = chat.connectionId;
     if (!connId) return reply.status(400).send({ error: "No API connection configured for this chat" });
 
     const connections = createConnectionsStorage(app.db);
-    let id = connId;
+
+    // Model resolution chain:
+    // 1. Chat Summary agent's own connection override
+    // 2. Default-for-agents connection
+    // 3. Chat's active connection
+    const { createAgentsStorage } = await import("../services/storage/agents.storage.js");
+    const agentsStore = createAgentsStorage(app.db);
+    const summaryAgentCfg = await agentsStore.getByType("chat-summary");
+    const defaultAgentConn = await connections.getDefaultForAgents();
+
+    let resolvedConnId: string | null =
+      summaryAgentCfg?.connectionId ?? defaultAgentConn?.id ?? null;
+
+    // Fall back to the chat connection
+    if (!resolvedConnId) {
+      resolvedConnId = connId;
+    }
+
+    // Resolve random pool if needed
+    let id = resolvedConnId;
     if (id === "random") {
       const pool = await connections.listRandomPool();
       if (!pool.length) return reply.status(400).send({ error: "No connections in random pool" });
@@ -925,9 +950,9 @@ export async function chatsRoutes(app: FastifyInstance) {
     const { createLLMProvider } = await import("../services/llm/provider-registry.js");
     const provider = createLLMProvider(conn.provider, baseUrl, conn.apiKey);
 
-    // Build conversation context
+    // Build conversation context (use contextSize from popover)
     const allMessages = await storage.listMessages(req.params.id);
-    const recentMessages = allMessages.slice(-60); // last 60 messages for context
+    const recentMessages = allMessages.slice(-contextSize);
     const chatLog = recentMessages.map((m: any) => `[${m.role}]: ${(m.content as string).slice(0, 2000)}`).join("\n\n");
 
     const previousSummary = chatMeta.summary ?? null;

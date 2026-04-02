@@ -9,7 +9,7 @@ export type ChatMode = "conversation" | "roleplay" | "visual_novel";
 export type GroupChatMode = "merged" | "individual";
 
 /** How individual-mode group chats decide response order. */
-export type GroupResponseOrder = "sequential" | "smart";
+export type GroupResponseOrder = "sequential" | "smart" | "manual";
 
 /** Role of a message in the conversation. */
 export type MessageRole = "user" | "assistant" | "system" | "narrator";

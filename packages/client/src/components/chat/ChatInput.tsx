@@ -2,7 +2,8 @@
 // Chat: Input — mode-aware styling
 // ──────────────────────────────────────────────
 import { useState, useRef, useCallback, useEffect, memo } from "react";
-import { Send, Paperclip, StopCircle, X, Smile } from "lucide-react";
+import { Send, Paperclip, StopCircle, X, Smile, Users } from "lucide-react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { useQueryClient, useQuery, skipToken, type InfiniteData } from "@tanstack/react-query";
 import { useChatStore } from "../../stores/chat.store";
@@ -35,15 +36,20 @@ const normalizeQuotes = (s: string) => s.replace(/["\u201C\u201D\u201E\u201F]/g,
 interface ChatInputProps {
   mode?: "conversation" | "roleplay";
   characterNames?: string[];
+  groupResponseOrder?: string;
+  chatCharacters?: Array<{ id: string; name: string; avatarUrl: string | null }>;
 }
 
-export const ChatInput = memo(function ChatInput({ mode = "conversation", characterNames = [] }: ChatInputProps) {
+export const ChatInput = memo(function ChatInput({ mode = "conversation", characterNames = [], groupResponseOrder, chatCharacters }: ChatInputProps) {
   const [hasInput, setHasInput] = useState(false);
   const [completions, setCompletions] = useState<SlashCommand[]>([]);
   const [selectedCompletion, setSelectedCompletion] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [charPickerOpen, setCharPickerOpen] = useState(false);
+  const charPickerBtnRef = useRef<HTMLButtonElement>(null);
+  const charPickerMenuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const inputBarRef = useRef<HTMLDivElement>(null);
@@ -173,6 +179,8 @@ export const ChatInput = memo(function ChatInput({ mode = "conversation", charac
 
     // If input is empty, check if we should retry or continue
     if (!hasText && !hasFiles) {
+      // Manual mode: no auto-retry/continue — use the character picker instead
+      if (groupResponseOrder === "manual") return;
       const cached = qc.getQueryData<InfiniteData<Message[]>>(chatKeys.messages(activeChatId));
       const firstPage = cached?.pages?.[0];
       const lastMsg = firstPage?.[firstPage.length - 1];
@@ -233,6 +241,21 @@ export const ChatInput = memo(function ChatInput({ mode = "conversation", charac
     setAttachments([]);
     clearInputDraft(activeChatId);
 
+    // Manual mode: only create the user message, no auto-generation
+    if (groupResponseOrder === "manual") {
+      try {
+        await createMessage.mutateAsync({
+          role: "user",
+          content: message,
+          characterId: null,
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Failed to send message";
+        toast.error(msg);
+      }
+      return;
+    }
+
     try {
       await generate({
         chatId: activeChatId,
@@ -245,7 +268,7 @@ export const ChatInput = memo(function ChatInput({ mode = "conversation", charac
       toast.error(msg);
       console.error("Send failed:", error);
     }
-  }, [activeChatId, isStreaming, generate, applyToUserInput, buildContext, qc, clearInputDraft, attachments, mode]);
+  }, [activeChatId, isStreaming, generate, applyToUserInput, buildContext, qc, clearInputDraft, attachments, mode, groupResponseOrder, createMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Autocomplete navigation
@@ -350,6 +373,64 @@ export const ChatInput = memo(function ChatInput({ mode = "conversation", charac
     setHasInput(el.value.length > 0);
     el.focus();
   }, []);
+
+  // Character picker: trigger a response from a specific character (manual mode)
+  const handleCharacterResponse = useCallback(
+    async (characterId: string) => {
+      if (!activeChatId || isStreaming) return;
+      setCharPickerOpen(false);
+      setCharPickerPos(null);
+      try {
+        await generate({
+          chatId: activeChatId,
+          connectionId: null,
+          forCharacterId: characterId,
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Generation failed";
+        toast.error(msg);
+      }
+    },
+    [activeChatId, isStreaming, generate],
+  );
+
+  // Close character picker on outside click
+  useEffect(() => {
+    if (!charPickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        charPickerMenuRef.current &&
+        !charPickerMenuRef.current.contains(e.target as Node) &&
+        charPickerBtnRef.current &&
+        !charPickerBtnRef.current.contains(e.target as Node)
+      ) {
+        setCharPickerOpen(false);
+        setCharPickerPos(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [charPickerOpen]);
+
+  // Position character picker above button
+  const [charPickerPos, setCharPickerPos] = useState<{ left: number; top: number } | null>(null);
+  useEffect(() => {
+    if (!charPickerOpen || !charPickerBtnRef.current) return;
+    const rect = charPickerBtnRef.current.getBoundingClientRect();
+    const inputBox = charPickerBtnRef.current.closest(".rounded-2xl") as HTMLElement | null;
+    const anchorTop = inputBox ? inputBox.getBoundingClientRect().top : rect.top;
+    requestAnimationFrame(() => {
+      const menuEl = charPickerMenuRef.current;
+      const menuHeight = menuEl?.offsetHeight || 300;
+      const menuWidth = menuEl?.offsetWidth || 220;
+      // Right-align the dropdown with the right edge of the button
+      let left = rect.right - menuWidth;
+      if (left < 8) left = 8;
+      setCharPickerPos({ left, top: Math.max(8, anchorTop - menuHeight - 4) });
+    });
+  }, [charPickerOpen]);
+
+  const showCharPicker = !!chatCharacters && chatCharacters.length > 1 && !!groupResponseOrder;
 
   return (
     <div className="mari-chat-input chat-input-container px-3 pb-3">
@@ -495,6 +576,23 @@ export const ChatInput = memo(function ChatInput({ mode = "conversation", charac
           />
         </div>
 
+        {/* Character picker — shown in group chats for manual response triggering */}
+        {showCharPicker && (
+          <button
+            ref={charPickerBtnRef}
+            onClick={() => setCharPickerOpen((v) => !v)}
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
+              charPickerOpen
+                ? "text-foreground bg-foreground/10"
+                : "text-foreground/40 hover:bg-foreground/10 hover:text-foreground/70",
+            )}
+            title="Trigger character response"
+          >
+            <Users size="1rem" />
+          </button>
+        )}
+
         {/* Send / Stop button */}
 
         <button
@@ -516,6 +614,44 @@ export const ChatInput = memo(function ChatInput({ mode = "conversation", charac
           )}
         </button>
       </div>
+
+      {/* Character picker dropdown (portal) */}
+      {charPickerOpen &&
+        showCharPicker &&
+        createPortal(
+          <div
+            ref={charPickerMenuRef}
+            className="fixed z-[9999] flex min-w-[220px] max-w-[280px] max-h-[320px] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-2xl"
+            style={charPickerPos ? { left: charPickerPos.left, top: charPickerPos.top } : { visibility: "hidden" as const }}
+          >
+            <div className="flex items-center justify-center border-b border-[var(--border)] px-3 py-2 text-[0.6875rem] font-semibold">
+              Trigger Response
+            </div>
+            <div className="overflow-y-auto p-1">
+              {chatCharacters!.map((char) => (
+                <button
+                  key={char.id}
+                  onClick={() => handleCharacterResponse(char.id)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-all hover:bg-[var(--accent)]"
+                >
+                  {char.avatarUrl ? (
+                    <img
+                      src={char.avatarUrl}
+                      alt={char.name}
+                      className="h-7 w-7 shrink-0 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--secondary)] text-[0.6875rem] font-semibold text-[var(--muted-foreground)]">
+                      {(char.name || "?")[0].toUpperCase()}
+                    </div>
+                  )}
+                  <span className="truncate text-xs">{char.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 });

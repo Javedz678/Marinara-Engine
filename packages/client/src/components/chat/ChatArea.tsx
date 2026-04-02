@@ -409,6 +409,13 @@ export function ChatArea() {
   const groupChatMode: string | undefined = chatCharIds.length > 1 ? (chatMeta.groupChatMode ?? "merged") : undefined;
 
   const updateMeta = useUpdateChatMetadata();
+  const summaryContextSize: number = (chatMeta.summaryContextSize as number) ?? 50;
+  const handleSummaryContextSizeChange = useCallback(
+    (size: number) => {
+      if (chat?.id) updateMeta.mutate({ id: chat.id, summaryContextSize: size });
+    },
+    [chat?.id, updateMeta],
+  );
 
   // Sync translation config from chat metadata to the translation store
   useEffect(() => {
@@ -1135,7 +1142,7 @@ export function ChatArea() {
                 )}
                 <div className="pointer-events-auto flex shrink-0 items-center gap-1.5 ml-auto">
                   <ToolbarMenu>
-                    <SummaryButton chatId={chat?.id ?? null} summary={chatMeta.summary ?? null} />
+                    <SummaryButton chatId={chat?.id ?? null} summary={chatMeta.summary ?? null} summaryContextSize={summaryContextSize} onContextSizeChange={handleSummaryContextSizeChange} />
                     <WorldInfoButton chatId={chat?.id ?? null} />
                     <AuthorNotesButton chatId={chat?.id ?? null} chatMeta={chatMeta} />
                     <RpToolbarButton
@@ -1193,7 +1200,7 @@ export function ChatArea() {
                       mobileCompact
                     />
                     <ToolbarMenu>
-                      <SummaryButton chatId={chat?.id ?? null} summary={chatMeta.summary ?? null} />
+                      <SummaryButton chatId={chat?.id ?? null} summary={chatMeta.summary ?? null} summaryContextSize={summaryContextSize} onContextSizeChange={handleSummaryContextSizeChange} />
                       <WorldInfoButton chatId={chat?.id ?? null} />
                       <AuthorNotesButton chatId={chat?.id ?? null} chatMeta={chatMeta} />
                       <RpToolbarButton
@@ -1235,7 +1242,7 @@ export function ChatArea() {
                 {chat && !chatMeta.enableAgents && (
                   <div className="flex w-full items-center justify-end gap-1.5 px-2 pt-2 pb-1">
                     <ToolbarMenu>
-                      <SummaryButton chatId={chat?.id ?? null} summary={chatMeta.summary ?? null} />
+                      <SummaryButton chatId={chat?.id ?? null} summary={chatMeta.summary ?? null} summaryContextSize={summaryContextSize} onContextSizeChange={handleSummaryContextSizeChange} />
                       <WorldInfoButton chatId={chat?.id ?? null} />
                       <AuthorNotesButton chatId={chat?.id ?? null} chatMeta={chatMeta} />
                       <RpToolbarButton
@@ -1417,7 +1424,15 @@ export function ChatArea() {
                     </button>
                   </div>
                 )}
-                <ChatInput mode={isRoleplay ? "roleplay" : "conversation"} characterNames={characterNames} />
+                <ChatInput
+                  mode={isRoleplay ? "roleplay" : "conversation"}
+                  characterNames={characterNames}
+                  groupResponseOrder={chatCharIds.length > 1 && groupChatMode === "individual" ? (chatMeta.groupResponseOrder ?? "sequential") : undefined}
+                  chatCharacters={chatCharIds.length > 1 ? chatCharIds.map((id) => {
+                    const info = characterMap.get(id);
+                    return { id, name: info?.name ?? "Unknown", avatarUrl: info?.avatarUrl ?? null };
+                  }) : undefined}
+                />
               </div>
             </div>
 
@@ -1682,7 +1697,7 @@ function ToolbarMenu({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SummaryButton({ chatId, summary }: { chatId: string | null; summary: string | null }) {
+function SummaryButton({ chatId, summary, summaryContextSize, onContextSizeChange }: { chatId: string | null; summary: string | null; summaryContextSize: number; onContextSizeChange: (size: number) => void }) {
   const [open, setOpen] = useState(false);
   const compact = useUIStore((s) => s.centerCompact);
   if (!chatId) return null;
@@ -1703,7 +1718,7 @@ function SummaryButton({ chatId, summary }: { chatId: string | null; summary: st
       >
         <ScrollText size="0.875rem" />
       </button>
-      {open && <SummaryPopover chatId={chatId} summary={summary} onClose={() => setOpen(false)} />}
+      {open && <SummaryPopover chatId={chatId} summary={summary} contextSize={summaryContextSize} onContextSizeChange={onContextSizeChange} onClose={() => setOpen(false)} />}
     </div>
   );
 }

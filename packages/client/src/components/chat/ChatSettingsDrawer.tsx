@@ -70,6 +70,14 @@ interface ChatSettingsDrawerProps {
   onClose: () => void;
 }
 
+// Agents that should not be manually added to roleplay chats
+const HIDDEN_ROLEPLAY_AGENTS = new Set([
+  "prompt-reviewer",
+  "schedule-planner",
+  "response-orchestrator",
+  "autonomous-messenger",
+]);
+
 export function ChatSettingsDrawer({ chat, open, onClose }: ChatSettingsDrawerProps) {
   const qc = useQueryClient();
   const updateChat = useUpdateChat();
@@ -107,9 +115,11 @@ export function ChatSettingsDrawer({ chat, open, onClose }: ChatSettingsDrawerPr
   const spritePosition: "left" | "right" = metadata.spritePosition ?? "left";
 
   // Build the available agent list: built-in + custom agents from DB
+  // In roleplay mode, hide agents that are either automatic or handled internally.
   const availableAgents = useMemo(() => {
     const agents: Array<{ id: string; name: string; description: string; category: string }> = [];
     for (const a of BUILT_IN_AGENTS) {
+      if (HIDDEN_ROLEPLAY_AGENTS.has(a.id)) continue;
       agents.push({ id: a.id, name: a.name, description: a.description, category: a.category });
     }
     // Custom agents from DB
@@ -982,24 +992,37 @@ export function ChatSettingsDrawer({ chat, open, onClose }: ChatSettingsDrawerPr
                           : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]",
                       )}
                     >
-                      All (Sequential)
+                      Sequential
                     </button>
                     <button
                       onClick={() => updateMeta.mutate({ id: chat.id, groupResponseOrder: "smart" })}
                       className={cn(
-                        "flex-1 px-3 py-2 text-[0.6875rem] font-medium transition-colors rounded-r-lg",
+                        "flex-1 px-3 py-2 text-[0.6875rem] font-medium transition-colors",
                         metadata.groupResponseOrder === "smart"
                           ? "bg-[var(--primary)] text-white"
                           : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]",
                       )}
                     >
-                      Smart (Scene-aware)
+                      Smart
+                    </button>
+                    <button
+                      onClick={() => updateMeta.mutate({ id: chat.id, groupResponseOrder: "manual" })}
+                      className={cn(
+                        "flex-1 px-3 py-2 text-[0.6875rem] font-medium transition-colors rounded-r-lg",
+                        metadata.groupResponseOrder === "manual"
+                          ? "bg-[var(--primary)] text-white"
+                          : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]",
+                      )}
+                    >
+                      Manual
                     </button>
                   </div>
                   <p className="text-[0.625rem] text-[var(--muted-foreground)]">
-                    {(metadata.groupResponseOrder ?? "sequential") === "sequential"
-                      ? "Characters respond one by one in their listed order."
-                      : "An AI agent decides which characters should respond based on the scene context."}
+                    {metadata.groupResponseOrder === "manual"
+                      ? "No automatic responses — use the character picker in the input bar to trigger responses one at a time."
+                      : metadata.groupResponseOrder === "smart"
+                        ? "An AI agent decides which characters should respond based on the scene context."
+                        : "Characters respond one by one in their listed order."}
                   </p>
                 </div>
               )}

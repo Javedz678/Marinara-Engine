@@ -11,10 +11,12 @@ import { cn } from "../../lib/utils";
 interface SummaryPopoverProps {
   chatId: string;
   summary: string | null;
+  contextSize: number;
+  onContextSizeChange: (size: number) => void;
   onClose: () => void;
 }
 
-export function SummaryPopover({ chatId, summary, onClose }: SummaryPopoverProps) {
+export function SummaryPopover({ chatId, summary, contextSize, onContextSizeChange, onClose }: SummaryPopoverProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(summary ?? "");
   const generateSummary = useGenerateSummary();
@@ -62,13 +64,13 @@ export function SummaryPopover({ chatId, summary, onClose }: SummaryPopoverProps
   }, [editing]);
 
   const handleGenerate = useCallback(() => {
-    generateSummary.mutate(chatId, {
+    generateSummary.mutate({ chatId, contextSize }, {
       onSuccess: (data) => {
         setDraft(data.summary);
         setEditing(false);
       },
     });
-  }, [chatId, generateSummary]);
+  }, [chatId, contextSize, generateSummary]);
 
   const handleSave = useCallback(() => {
     updateMeta.mutate({ id: chatId, summary: draft || null });
@@ -104,6 +106,22 @@ export function SummaryPopover({ chatId, summary, onClose }: SummaryPopoverProps
             Chat Summary
           </div>
           <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 mr-1" title="Context size — number of recent messages used for summary generation">
+              <input
+                type="number"
+                min={5}
+                max={200}
+                value={contextSize === 0 ? "" : contextSize}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") { onContextSizeChange(0); return; }
+                  const v = Math.max(5, Math.min(200, parseInt(raw) || 50));
+                  onContextSizeChange(v);
+                }}
+                onBlur={() => { if (!contextSize) onContextSizeChange(50); }}
+                className="w-12 rounded-md bg-[var(--secondary)] px-1.5 py-0.5 text-center text-[0.625rem] tabular-nums ring-1 ring-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              />
+            </div>
             <button
               onClick={handleGenerate}
               disabled={isGenerating}
@@ -188,8 +206,9 @@ export function SummaryPopover({ chatId, summary, onClose }: SummaryPopoverProps
           <p className="flex items-start gap-1.5 text-[0.625rem] leading-relaxed text-[var(--muted-foreground)]">
             <Info size="0.6875rem" className="mt-0.5 shrink-0 text-amber-400/70" />
             <span>
-              Add a <strong className="font-medium text-[var(--foreground)]/70">Chat Summary</strong> agent to include
-              this summary in your prompt context. Use the Generate button above to update it manually.
+              Use the Generate button above to update the summary manually. Add an{" "}
+              <strong className="font-medium text-[var(--foreground)]/70">Automated Chat Summary</strong> agent to the
+              chat if you&apos;d like it to be updated automatically every X messages.
             </span>
           </p>
         </div>

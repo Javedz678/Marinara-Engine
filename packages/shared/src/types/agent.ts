@@ -313,9 +313,9 @@ export const BUILT_IN_AGENTS: BuiltInAgentMeta[] = [
   },
   {
     id: "chat-summary",
-    name: "Chat Summary",
+    name: "Automated Chat Summary",
     description:
-      "Generates a rolling summary of the conversation so far, capturing key events, character developments, and plot points.",
+      "Automatically generates a rolling summary of the conversation every X user messages. Add to a chat for hands-free summary updates.",
     phase: "post_processing",
     enabledByDefault: false,
     category: "misc",

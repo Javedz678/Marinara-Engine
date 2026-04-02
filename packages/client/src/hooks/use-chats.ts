@@ -299,9 +299,10 @@ export function useBranchChat() {
 export function useGenerateSummary() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (chatId: string) => api.post<{ summary: string }>(`/chats/${chatId}/generate-summary`, {}),
-    onSuccess: (_data, chatId) => {
-      qc.invalidateQueries({ queryKey: chatKeys.detail(chatId) });
+    mutationFn: ({ chatId, contextSize }: { chatId: string; contextSize?: number }) =>
+      api.post<{ summary: string }>(`/chats/${chatId}/generate-summary`, { contextSize }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: chatKeys.detail(vars.chatId) });
     },
   });
 }

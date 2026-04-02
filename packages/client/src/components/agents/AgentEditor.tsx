@@ -137,7 +137,7 @@ export function AgentEditor() {
   useEffect(() => {
     if (!agentDetailId) return;
     if (dbConfig) {
-      setLocalName(dbConfig.name);
+      setLocalName(builtIn ? builtIn.name : dbConfig.name);
       setLocalDescription(dbConfig.description);
       setLocalPhase(dbConfig.phase as AgentPhase);
       setLocalConnectionId(dbConfig.connectionId ?? "");
@@ -191,6 +191,9 @@ export function AgentEditor() {
 
   // Lorebook Keeper agent — run interval setting
   const isLorebookKeeperAgent = agentDetailId === "lorebook-keeper" || dbConfig?.type === "lorebook-keeper";
+
+  // Chat Summary agent — uses "Triggers After" instead of context size
+  const isChatSummaryAgent = agentDetailId === "chat-summary" || dbConfig?.type === "chat-summary";
 
   // Knowledge Retrieval agent — lorebook source selector
   const isKnowledgeRetrievalAgent = agentDetailId === "knowledge-retrieval" || dbConfig?.type === "knowledge-retrieval";
@@ -524,7 +527,8 @@ export function AgentEditor() {
             </p>
           </FieldGroup>
 
-          {/* ── Context Size ── */}
+          {/* ── Context Size (hidden for Chat Summary — that uses the popover) ── */}
+          {!isChatSummaryAgent && (
           <FieldGroup
             label="Context Size"
             icon={<Clock size="0.875rem" className="text-[var(--primary)]" />}
@@ -551,6 +555,37 @@ export function AgentEditor() {
               context size in the batch is used.
             </p>
           </FieldGroup>
+          )}
+
+          {/* ── Triggers After (Chat Summary agent) ── */}
+          {isChatSummaryAgent && (
+            <FieldGroup
+              label="Triggers After"
+              icon={<Clock size="0.875rem" className="text-[var(--primary)]" />}
+              help="How many user messages must be sent since the last automatic summary before the agent triggers again. The context size for each summary generation is set in the Chat Summary panel in the chat itself."
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={200}
+                  value={localRunInterval}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setLocalRunInterval(v === "" ? "" : Math.max(1, Math.min(200, parseInt(v) || 1)));
+                    markDirty();
+                  }}
+                  placeholder="5"
+                  className="w-28 rounded-xl bg-[var(--secondary)] px-3 py-2.5 text-sm tabular-nums ring-1 ring-[var(--border)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                />
+                <span className="text-[0.6875rem] text-[var(--muted-foreground)]">user messages</span>
+              </div>
+              <p className="mt-1 text-[0.625rem] text-[var(--muted-foreground)]">
+                The automatic summary will trigger after this many user messages have been sent since the last summary
+                update.
+              </p>
+            </FieldGroup>
+          )}
 
           {/* ── Run Interval (Lorebook Keeper) ── */}
           {isLorebookKeeperAgent && (
