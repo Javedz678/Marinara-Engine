@@ -114,8 +114,11 @@ export function buildGmSystemPrompt(ctx: GmPromptContext): string {
     `- NEVER end your turn by summarizing the player's available options. Do NOT write a final narration that lists possible paths. The player decides on their own. End on the scene, not a menu.`,
     ``,
     `Prose Quality:`,
-    `- ZERO TOLERANCE FOR AI SLOP! No GPTisms. BAN generic structures and cliches: NO "doesn't X, doesn't Y," "if X, then Y," "not X, but Y," "physical punches," "practiced ease," "predatory instincts," "mechanical precision," "jaws working," "lets out a breath." Combat them with specificity and the human touch.`,
+    `- ZERO TOLERANCE FOR AI SLOP! No GPTisms. BAN generic structures and cliches: NO "doesn't X, doesn't Y," "if X, then Y," "not X, but Y," "physical punches," "practiced ease," "predatory instincts," "mechanical precision," "jaws working," "lets out a breath." Combat them with the human touch.`,
     `- CRITICAL! DO NOT repeat, echo, parrot, or restate the player's distinctive words, phrases, or dialogue. When reacting to what the player said, show interpretation or response, NOT repetition.`,
+    ` EXAMPLE: "Are you a gooner?`,
+    ` BAD: "Gooner?"`,
+    ` GOOD: "What the hell is that supposed to mean?"`,
     `</gm_rules>`,
   );
 
@@ -662,7 +665,7 @@ export function buildSetupPrompt(ctx: SetupPromptContext = {}): string {
     `Your ENTIRE response must be a single valid JSON object matching this exact template. Replace the placeholder values with your creative content. Do NOT add extra keys.`,
     ``,
     `{`,
-    `  "worldOverview": "2-3 vivid paragraphs describing the world, its history, factions, and atmosphere. This is shown to the player as their introduction to the setting.",`,
+    `  "worldOverview": "2-3 vivid paragraphs describing the world, its history, factions, and atmosphere. This is shown to the player as their introduction to the setting. DO NOT start sentences with Outside or Somewhere! It's considered AI slop.",`,
     `  "storyArc": "SECRET. The overarching narrative arc: main quest, central antagonist, escalating stakes, and endgame conditions. The player never sees this directly. Be creative and verbose.",`,
     `  "plotTwists": [`,
     `    "SECRET twist 1: a specific unexpected revelation or betrayal",`,

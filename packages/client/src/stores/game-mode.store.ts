@@ -101,7 +101,25 @@ export const useGameModeStore = create<GameModeStore>((set) => ({
     set({ activeGameId: gameId, activeSessionChatId: sessionChatId ?? null, partyChatId: partyChatId ?? null }),
   setGameState: (state) => set({ gameState: state }),
   setCurrentMap: (map) => set({ currentMap: map }),
-  setNpcs: (npcs) => set({ npcs }),
+  setNpcs: (npcs) =>
+    set((s) => {
+      // Preserve existing avatarUrls: the incoming list may come from a stale
+      // chat-metadata cache that predates a recent /generate-assets call. If
+      // we already have an avatarUrl for an NPC and the incoming record is
+      // missing one, keep ours rather than clobbering it to null.
+      const existingByName = new Map<string, string>();
+      for (const existing of s.npcs) {
+        if (existing.avatarUrl && existing.name) {
+          existingByName.set(existing.name.toLowerCase(), existing.avatarUrl);
+        }
+      }
+      const merged = npcs.map((npc) => {
+        if (npc.avatarUrl) return npc;
+        const preserved = existingByName.get((npc.name ?? "").toLowerCase());
+        return preserved ? { ...npc, avatarUrl: preserved } : npc;
+      });
+      return { npcs: merged };
+    }),
   patchNpcAvatars: (avatars) =>
     set((s) => ({
       npcs: s.npcs.map((npc) => {
