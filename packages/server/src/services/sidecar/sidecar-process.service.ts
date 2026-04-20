@@ -253,7 +253,7 @@ class SidecarProcessService {
     return runtime.pythonPath;
   }
 
-  private buildLlamaArgs(modelPath: string, gpuLayers: number, port: number): string[] {
+  private buildLlamaArgs(modelPath: string, gpuLayers: number, port: number, runtime: SidecarRuntimeInstall): string[] {
     const config = sidecarModelService.getConfig();
     const args = [
       "-m",
@@ -263,14 +263,17 @@ class SidecarProcessService {
       "--parallel",
       "2",
       "--log-disable",
-      "-sm",
-      "none",
       "--ctx-size",
       String(config.contextSize),
       "--port",
       String(port),
     ];
 
+    // Gemma 4 needs split mode disabled on CUDA multi-GPU launches,
+    // but non-CUDA builds may reject the flag entirely.
+    if (/cuda/i.test(runtime.variant) && gpuLayers > 0) {
+      args.push("-sm", "none");
+    }
     args.push("-ngl", String(gpuLayers));
     return args;
   }
@@ -443,7 +446,7 @@ class SidecarProcessService {
     for (let attempt = 0; attempt < startupPlans.length; attempt += 1) {
       const plan = startupPlans[attempt]!;
       const port = await getFreePort();
-      const args = this.buildLlamaArgs(modelPath, plan.gpuLayers, port);
+      const args = this.buildLlamaArgs(modelPath, plan.gpuLayers, port, runtime);
       sidecarRuntimeService.setLaunchDiagnostics(`${runtime.serverPath} ${this.formatCommandArgs(args)}`, "llama_cpp");
 
       const logStream = createWriteStream(sidecarRuntimeService.getLogPath(), { flags: "a" });
