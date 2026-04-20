@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an improvement or new feature for Marinara Engine
+about: Suggest an improvement or new feature
 title: "[Feature]: "
 labels: "enhancement"
 assignees: ""
@@ -24,7 +24,6 @@ assignees: ""
 
 ## Template check
 
-Please **uncheck (untick)** the box below before submitting so we know you read the template.
-It is intentionally pre-checked:
+Please **uncheck (untick)** the box below before submitting so we know you read the template. It is intentionally pre-checked:
 
-- [x] I read this template and will provide the requested details.
+- [x] I DID NOT read this template and provide the requested details.

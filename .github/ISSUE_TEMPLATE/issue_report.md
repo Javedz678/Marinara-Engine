@@ -2,7 +2,7 @@
 name: Issue report
 about: Report a bug, regression, or usability problem
 title: "[Issue]: "
-labels: ""
+labels: "bug"
 assignees: ""
 ---
 
@@ -41,7 +41,6 @@ assignees: ""
 
 ## Template check
 
-Please **uncheck (untick)** the box below before submitting so we know you read the template.
-It is intentionally pre-checked:
+Please **uncheck (untick)** the box below before submitting so we know you read the template. It is intentionally pre-checked:
 
-- [x] I read this template and will provide the requested details.
+- [x] I DID NOT read this template and provide the requested details.
