@@ -78,7 +78,20 @@ interface SidecarState {
   sendTestMessage: () => Promise<void>;
   reinstallRuntime: () => Promise<void>;
   updateConfig: (
-    partial: Partial<Pick<SidecarConfig, "useForTrackers" | "useForGameScene" | "contextSize" | "gpuLayers" | "runtimePreference">>,
+    partial: Partial<
+      Pick<
+        SidecarConfig,
+        | "useForTrackers"
+        | "useForGameScene"
+        | "contextSize"
+        | "maxTokens"
+        | "temperature"
+        | "topP"
+        | "topK"
+        | "gpuLayers"
+        | "runtimePreference"
+      >
+    >,
   ) => Promise<void>;
   setShowDownloadModal: (open: boolean) => void;
   markPrompted: () => void;

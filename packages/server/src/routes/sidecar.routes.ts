@@ -61,6 +61,10 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
     useForTrackers: z.boolean().optional(),
     useForGameScene: z.boolean().optional(),
     contextSize: z.number().int().min(512).max(32768).optional(),
+    maxTokens: z.number().int().min(64).max(32768).optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    topP: z.number().gt(0).max(1).optional(),
+    topK: z.number().int().min(0).max(500).optional(),
     gpuLayers: z.number().int().min(-1).max(1024).optional(),
     runtimePreference: z.enum(SIDECAR_RUNTIME_PREFERENCES).optional(),
   });

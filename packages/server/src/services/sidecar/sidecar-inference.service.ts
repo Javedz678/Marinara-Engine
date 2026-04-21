@@ -136,12 +136,24 @@ function extractChoiceContent(
   };
 }
 
+function getRuntimeGenerationSettings() {
+  const config = sidecarModelService.getConfig();
+  return {
+    maxTokens: Math.max(64, Math.floor(config.maxTokens)),
+    temperature: Math.min(2, Math.max(0, config.temperature)),
+    topP: Math.min(1, Math.max(Number.EPSILON, config.topP)),
+    topK: Math.max(0, Math.floor(config.topK)),
+  };
+}
+
 async function streamChatCompletion(options: {
   messages: SidecarMessage[];
   maxTokens: number;
   responseFormat?: Record<string, unknown>;
 }): Promise<string> {
   const baseUrl = await sidecarProcessService.ensureReady();
+  const generation = getRuntimeGenerationSettings();
+  const maxTokens = Math.min(Math.max(1, Math.floor(options.maxTokens)), generation.maxTokens);
   const response = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: "POST",
     headers: {
@@ -151,10 +163,10 @@ async function streamChatCompletion(options: {
       model: getRequestModel(),
       stream: true,
       messages: options.messages,
-      max_tokens: options.maxTokens,
-      temperature: 1.0,
-      top_p: 0.95,
-      top_k: 64,
+      max_tokens: maxTokens,
+      temperature: generation.temperature,
+      top_p: generation.topP,
+      ...(generation.topK > 0 ? { top_k: generation.topK } : {}),
       ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
     }),
     signal: AbortSignal.timeout(5 * 60_000),

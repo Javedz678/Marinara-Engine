@@ -62,6 +62,10 @@ export class OpenAIProvider extends BaseLLMProvider {
     return { text, thinking };
   }
 
+  private shouldSendTopK(): boolean {
+    return this.apiKey === "local-sidecar";
+  }
+
   /**
    * Extract reasoning/thinking from an OpenAI-compatible message or delta object.
    * Handles multiple provider formats:
@@ -247,6 +251,9 @@ export class OpenAIProvider extends BaseLLMProvider {
       body.temperature = options.temperature ?? 1;
       const topP = OpenAIProvider.normalizeTopP(options.topP);
       if (topP != null) body.top_p = topP;
+      if (this.shouldSendTopK() && typeof options.topK === "number" && Number.isFinite(options.topK) && options.topK > 0) {
+        body.top_k = Math.round(options.topK);
+      }
       if (options.frequencyPenalty) body.frequency_penalty = options.frequencyPenalty;
       if (options.presencePenalty) body.presence_penalty = options.presencePenalty;
     }
@@ -431,6 +438,9 @@ export class OpenAIProvider extends BaseLLMProvider {
       body.temperature = options.temperature ?? 1;
       const topP = OpenAIProvider.normalizeTopP(options.topP);
       if (topP != null) body.top_p = topP;
+      if (this.shouldSendTopK() && typeof options.topK === "number" && Number.isFinite(options.topK) && options.topK > 0) {
+        body.top_k = Math.round(options.topK);
+      }
       if (options.frequencyPenalty) body.frequency_penalty = options.frequencyPenalty;
       if (options.presencePenalty) body.presence_penalty = options.presencePenalty;
     }
