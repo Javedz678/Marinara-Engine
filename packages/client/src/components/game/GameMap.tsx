@@ -477,7 +477,7 @@ export function MobileMapButton({
     activeMap &&
     !disabled &&
     selectedNode != null &&
-    (adjacentIds.has(selectedNode) || selectedNode === currentNode?.id);
+    (selectedNodeData?.discovered || adjacentIds.has(selectedNode) || selectedNode === currentNode?.id);
 
   return (
     <>

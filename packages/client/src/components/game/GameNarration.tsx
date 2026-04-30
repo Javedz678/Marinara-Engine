@@ -108,6 +108,8 @@ interface NarrationSegment {
 type SpeakerAvatarInfo = {
   url: string;
   crop?: AvatarCrop | null;
+  nameColor?: string;
+  dialogueColor?: string;
 };
 
 type GameSegmentVoiceEntry =
@@ -129,6 +131,10 @@ type GameSideLine = PartyDialogueLine & {
 };
 
 const EMPTY_GAME_SIDE_LINES: GameSideLine[] = [];
+
+function isCombatResultMessage(message: NarrationMessage): boolean {
+  return message.role === "user" && /\[combat_result\]/i.test(message.content || "");
+}
 
 interface GameVoiceAudioJob {
   cacheKey: string;
@@ -196,6 +202,8 @@ interface GameNarrationProps {
   widgetSlot?: ReactNode;
   /** Slot rendered above the narration box for GM choice cards */
   choicesSlot?: ReactNode;
+  /** Slot rendered above the narration box for dice roll results */
+  diceResultSlot?: ReactNode;
   /** Slot rendered above the narration box for skill check results */
   skillCheckSlot?: ReactNode;
   /** Open the inventory panel */
@@ -363,6 +371,7 @@ function buildVoiceConfigSignature(config?: TTSConfig | null): string {
     JSON.stringify(config.npcDefaultFemaleVoices ?? []),
     config.speed,
     config.elevenLabsStability,
+    config.elevenLabsLanguageCode,
     config.dialogueOnly ? "dialogue" : "all-text",
     config.dialogueScope,
     config.dialogueCharacterName,
@@ -379,6 +388,7 @@ function buildVoiceLineTextCacheKey(
     config.model,
     config.speed,
     config.elevenLabsStability,
+    config.elevenLabsLanguageCode,
     job.voice ?? "",
     job.speaker ?? "",
     job.tone ?? "",
@@ -593,6 +603,7 @@ export function GameNarration({
   onNarrationComplete,
   widgetSlot,
   choicesSlot,
+  diceResultSlot,
   skillCheckSlot,
   onOpenInventory,
   inventoryCount,
@@ -621,6 +632,7 @@ export function GameNarration({
   const [activeIndex, setActiveIndex] = useState(0);
   const [visibleChars, setVisibleChars] = useState(0);
   const [logsOpen, setLogsOpen] = useState(false);
+  const messagesPerPage = useUIStore((s) => s.messagesPerPage);
   const [editingContent, setEditingContent] = useState<string | null>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [editingLogSeg, setEditingLogSeg] = useState<{
@@ -670,11 +682,17 @@ export function GameNarration({
       const color = c.dialogueColor || c.nameColor;
       if (color) byName.set(c.name.toLowerCase(), color);
     }
+    if (speakerAvatarMap) {
+      for (const [name, info] of speakerAvatarMap) {
+        const color = info.dialogueColor || info.nameColor;
+        if (color) byName.set(name.toLowerCase(), color);
+      }
+    }
     if (personaInfo?.name && (personaInfo.dialogueColor || personaInfo.nameColor)) {
       byName.set(personaInfo.name.toLowerCase(), personaInfo.dialogueColor || personaInfo.nameColor || "");
     }
     return byName;
-  }, [activeCharacterEntries, personaInfo]);
+  }, [activeCharacterEntries, personaInfo, speakerAvatarMap]);
 
   /** Name-display colors (prefers nameColor which may be a gradient). */
   const speakerNameColors = useMemo(() => {
@@ -683,11 +701,17 @@ export function GameNarration({
       const color = c.nameColor || c.dialogueColor;
       if (color) byName.set(c.name.toLowerCase(), color);
     }
+    if (speakerAvatarMap) {
+      for (const [name, info] of speakerAvatarMap) {
+        const color = info.nameColor || info.dialogueColor;
+        if (color) byName.set(name.toLowerCase(), color);
+      }
+    }
     if (personaInfo?.name && (personaInfo.nameColor || personaInfo.dialogueColor)) {
       byName.set(personaInfo.name.toLowerCase(), personaInfo.nameColor || personaInfo.dialogueColor || "");
     }
     return byName;
-  }, [activeCharacterEntries, personaInfo]);
+  }, [activeCharacterEntries, personaInfo, speakerAvatarMap]);
 
   const gameNpcs = useGameModeStore((s) => s.npcs);
   const sourceMessagesById = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
@@ -841,9 +865,14 @@ export function GameNarration({
       }
     }
     if (assistantIdx < 0) return null;
+    // While a hidden combat-result handoff is waiting for the GM continuation,
+    // keep showing the last GM narration rather than resurrecting the pre-combat
+    // player action as the active VN segment.
+    if (messages.slice(assistantIdx + 1).some(isCombatResultMessage)) return null;
     // Scan backwards from the assistant to find the preceding user message
     for (let i = assistantIdx - 1; i >= 0; i--) {
       const msg = messages[i]!;
+      if (isCombatResultMessage(msg)) continue;
       if (msg.role === "user") return msg;
       if (msg.role === "assistant" || msg.role === "narrator") break;
     }
@@ -1634,6 +1663,24 @@ export function GameNarration({
     sourceMessagesById,
     doneTyping,
   ]);
+  const logPageSize = Math.max(1, messagesPerPage > 0 ? messagesPerPage : logEntries.length || 20);
+  const [visibleLogCount, setVisibleLogCount] = useState(logPageSize);
+  useEffect(() => {
+    if (!logsOpen) return;
+    setVisibleLogCount(logPageSize);
+    logScrolledRef.current = false;
+  }, [logPageSize, logsOpen]);
+  const visibleLogEntries = useMemo(
+    () => logEntries.slice(Math.max(0, logEntries.length - visibleLogCount)),
+    [logEntries, visibleLogCount],
+  );
+  const hiddenLogCount = Math.max(0, logEntries.length - visibleLogEntries.length);
+  const loadOlderLogs = useCallback(() => {
+    setVisibleLogCount((current) => Math.min(logEntries.length, current + logPageSize));
+  }, [logEntries.length, logPageSize]);
+  const showAllLogs = useCallback(() => {
+    setVisibleLogCount(logEntries.length);
+  }, [logEntries.length]);
 
   // Report active speaker to parent for sprite viewport
   // Guard against infinite re-render: skip callback if the resolved speaker hasn't changed,
@@ -2429,6 +2476,9 @@ export function GameNarration({
         {/* Skill check result — shown above the narration box until dismissed */}
         {skillCheckSlot}
 
+        {/* Dice roll result — shown closest to the narration box until dismissed */}
+        {diceResultSlot}
+
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-3 backdrop-blur-md shadow-[0_16px_38px_rgba(0,0,0,0.45)] dark:border-white/15 dark:bg-black/50">
           {/* Scene preparation gate: wait for effects before showing narration */}
           {scenePreparing && (
@@ -2876,21 +2926,54 @@ export function GameNarration({
             className="relative mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl border border-white/15 bg-[var(--card)] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-              <h3 className="text-sm font-semibold text-white">Session Logs</h3>
-              <button
-                onClick={() => {
-                  setLogsOpen(false);
-                  setEditingLogSeg(null);
-                  logScrolledRef.current = false;
-                }}
-                className="rounded-lg p-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <X size={16} />
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-white">Session Logs</h3>
+                {logEntries.length > 0 && (
+                  <p className="text-[0.65rem] text-white/45">
+                    Showing {visibleLogEntries.length} of {logEntries.length}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {hiddenLogCount > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={loadOlderLogs}
+                      className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[0.65rem] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+                      title="Load older logs"
+                    >
+                      Older ({hiddenLogCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={showAllLogs}
+                      className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[0.65rem] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+                      title="Load the entire session log"
+                    >
+                      All
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => {
+                    setLogsOpen(false);
+                    setEditingLogSeg(null);
+                    logScrolledRef.current = false;
+                  }}
+                  className="rounded-lg p-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
             <div
               className="flex-1 overflow-y-auto px-4 py-3 space-y-4"
+              onScroll={(e) => {
+                if (hiddenLogCount <= 0) return;
+                if (e.currentTarget.scrollTop <= 8) loadOlderLogs();
+              }}
               ref={(el) => {
                 // Auto-scroll to bottom once so the user sees the most recent logs
                 if (el && !logScrolledRef.current) {
@@ -2904,7 +2987,21 @@ export function GameNarration({
               {logEntries.length === 0 && (
                 <p className="text-sm text-[var(--muted-foreground)]">No previous logs yet.</p>
               )}
-              {logEntries.map((entry) => {
+              {hiddenLogCount > 0 && (
+                <div className="flex justify-center pb-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logScrolledRef.current = true;
+                      loadOlderLogs();
+                    }}
+                    className="rounded-full border border-white/10 bg-black/55 px-3 py-1.5 text-xs font-medium text-white/70 shadow-lg transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    Show more older logs ({hiddenLogCount})
+                  </button>
+                </div>
+              )}
+              {visibleLogEntries.map((entry) => {
                 const sourceMessage = sourceMessagesById.get(entry.messageId) ?? null;
                 const translatedEntryText = sourceMessage ? translations[entry.messageId] : undefined;
                 const entryIsTranslating = sourceMessage ? !!translating[entry.messageId] : false;
@@ -3992,19 +4089,163 @@ function splitInlineDialogue(
   return result;
 }
 
-function formatNarration(content: string, boldDialogue = true): string {
+function commandBadge(className: string, label: string, detail?: string): string {
+  return `<span class="inline-flex max-w-full flex-wrap items-center gap-1 rounded px-1.5 py-0.5 text-xs ${className}">${label}${
+    detail ? ` <span class="opacity-75">${detail}</span>` : ""
+  }</span>`;
+}
+
+function parseCommandAttributes(source: string): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  const attrRe = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/g;
+  let match: RegExpExecArray | null;
+  while ((match = attrRe.exec(source)) !== null) {
+    attrs[match[1]!] = match[2] ?? match[3] ?? match[4] ?? "";
+  }
+  return attrs;
+}
+
+function formatSignedNumber(value: string): string {
+  const numeric = Number(value.trim());
+  if (!Number.isFinite(numeric)) return value.trim();
+  return numeric > 0 ? `+${numeric}` : String(numeric);
+}
+
+export function formatNarration(content: string, boldDialogue = true): string {
   let html = content
+    .replace(/\[combat_result]\s*([\s\S]*?)\s*\[\/combat_result]/gi, (_match, recap: string) => {
+      const cleaned = recap.trim();
+      return `${commandBadge("bg-red-500/15 text-red-200 ring-1 ring-red-400/20", "⚔ Combat Result")}${
+        cleaned ? `\n${cleaned}` : ""
+      }`;
+    })
+    .replace(
+      /\[dice:\s*((?:\d+)?d\d+(?:[+-]\d+)?)\s*=\s*(-?\d+)(?:\s*\([^\]]+\))?\]/gi,
+      (_match, notation: string, total: string) =>
+        commandBadge("bg-white/10 text-white/60 font-mono", "🎲", `${notation} → ${total}`),
+    )
+    .replace(/\[qte_bonus:\s*(-?\d+)\]/gi, (_match, bonus: string) =>
+      commandBadge("bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20", "⏱ QTE Bonus", formatSignedNumber(bonus)),
+    )
+    .replace(/\[qte_result:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      const status = attrs.status === "fail" ? "Fail" : attrs.status === "success" ? "Success" : "Result";
+      const modifier = attrs.modifier ? formatSignedNumber(attrs.modifier) : "";
+      return commandBadge("bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20", `⏱ QTE ${status}`, modifier);
+    })
+    .replace(/\[skill_check:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      const skill = attrs.skill || "Skill";
+      const dc = attrs.dc ? `DC ${attrs.dc}` : "";
+      const total = attrs.total ? `total ${attrs.total}` : "";
+      const result = attrs.result ? attrs.result.replace(/_/g, " ") : "";
+      return commandBadge(
+        "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20",
+        "🎯 Skill Check",
+        [skill, dc, total, result].filter(Boolean).join(" · "),
+      );
+    })
+    .replace(/\[combat:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      return commandBadge(
+        "bg-red-500/15 text-red-200 ring-1 ring-red-400/20",
+        "⚔ Combat",
+        attrs.enemies || rawAttrs.trim(),
+      );
+    })
+    .replace(/\[status:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      const modifier = attrs.modifier ? `${attrs.stat || "modifier"} ${formatSignedNumber(attrs.modifier)}` : "";
+      const turns = attrs.turns || attrs.duration ? `${attrs.turns || attrs.duration} turns` : "";
+      return commandBadge(
+        "bg-rose-500/15 text-rose-200 ring-1 ring-rose-400/20",
+        "✦ Status",
+        [attrs.effect || attrs.name || "Effect", attrs.target ? `on ${attrs.target}` : "", turns, modifier]
+          .filter(Boolean)
+          .join(" · "),
+      );
+    })
+    .replace(/\[element_attack:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      return commandBadge(
+        "bg-orange-500/15 text-orange-200 ring-1 ring-orange-400/20",
+        "✦ Element",
+        [attrs.element, attrs.target ? `on ${attrs.target}` : ""].filter(Boolean).join(" · ") || rawAttrs.trim(),
+      );
+    })
+    .replace(/\[qte:\s*([^\]]+)\]/gi, (_match, body: string) =>
+      commandBadge("bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20", "⏱ QTE", body.trim()),
+    )
+    .replace(/\[choices:\s*([^\]]+)\]/gi, (_match, body: string) =>
+      commandBadge("bg-indigo-500/15 text-indigo-200 ring-1 ring-indigo-400/20", "☑ Choices", body.trim()),
+    )
+    .replace(/\[inventory:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      return commandBadge(
+        "bg-lime-500/15 text-lime-200 ring-1 ring-lime-400/20",
+        "🎒 Inventory",
+        [attrs.action, attrs.item].filter(Boolean).join(": "),
+      );
+    })
+    .replace(/\[map_update:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      return commandBadge(
+        "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20",
+        "🗺 Map",
+        attrs.new_location || rawAttrs.trim(),
+      );
+    })
+    .replace(/\[reputation:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      return commandBadge(
+        "bg-fuchsia-500/15 text-fuchsia-200 ring-1 ring-fuchsia-400/20",
+        "◆ Reputation",
+        [attrs.npc, attrs.action].filter(Boolean).join(": "),
+      );
+    })
+    .replace(/\[party_change:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      return commandBadge(
+        "bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-400/20",
+        "👥 Party",
+        [attrs.change, attrs.character].filter(Boolean).join(": "),
+      );
+    })
+    .replace(/\[party_add:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      return commandBadge(
+        "bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-400/20",
+        "👥 Party",
+        attrs.character || rawAttrs.trim(),
+      );
+    })
+    .replace(/\[session_end:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      return commandBadge("bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/20", "🏁 Session End", attrs.reason);
+    })
+    .replace(/\[(music|sfx|bg|ambient):\s*([^\]]+)\]/gi, (_match, kind: string, body: string) =>
+      commandBadge("bg-slate-500/15 text-slate-200 ring-1 ring-slate-400/20", kind.toUpperCase(), body.trim()),
+    )
+    .replace(/\[direction:\s*([^\]]+)\]/gi, (_match, body: string) =>
+      commandBadge("bg-zinc-500/15 text-zinc-200 ring-1 ring-zinc-400/20", "Direction", body.trim()),
+    )
+    .replace(/\[widget:\s*([^\]]+)\]/gi, (_match, body: string) =>
+      commandBadge("bg-teal-500/15 text-teal-200 ring-1 ring-teal-400/20", "Widget", body.trim()),
+    )
+    .replace(/\[dialogue:\s*([^\]]+)\]/gi, (_match, rawAttrs: string) => {
+      const attrs = parseCommandAttributes(rawAttrs);
+      return commandBadge(
+        "bg-blue-500/15 text-blue-200 ring-1 ring-blue-400/20",
+        "Dialogue",
+        attrs.npc || rawAttrs.trim(),
+      );
+    })
+    .replace(/\[state:\s*(\w+)\]/gi, (_match, state: string) =>
+      commandBadge("bg-sky-500/20 text-sky-300", "⚡ State", state),
+    )
     .replace(/\*\*(.+?)\*\*/gs, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/gs, "<em>$1</em>")
-    .replace(/\n/g, "<br />")
-    .replace(
-      /\[dice:(\d+d\d+[+-]?\d*)\s*=\s*(\d+)\]/g,
-      '<span class="inline-flex items-center gap-1 rounded bg-white/10 px-1.5 py-0.5 text-xs text-white/60 font-mono">🎲 $1 → $2</span>',
-    )
-    .replace(
-      /\[state:\s*(\w+)\]/g,
-      '<span class="inline-flex items-center gap-1 rounded bg-sky-500/20 px-1.5 py-0.5 text-xs text-sky-300">⚡ $1</span>',
-    );
+    .replace(/\n/g, "<br />");
 
   if (boldDialogue) {
     const narrationQuoteRe = new RegExp(`(?<![=\\w])(?:${HTML_SAFE_DIALOGUE_QUOTE_PATTERN_SOURCE})`, "g");
